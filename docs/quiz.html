@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Quiz App</title>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            font-family: Gotham Rounded;
+        }
+
+        :root {
+            --hue-neutral: 200;
+            --hue-wrong: 0;
+            --hue-correct: 145;
+        }
+
+        body {
+            --hue: var(--hue-neutral);
+            padding: 0;
+            margin: 0;
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+            background-color: hsl(var(--hue), 100%, 20%);
+        }
+
+        body.correct {
+            --hue: var(--hue-correct);
+        }
+
+        body.wrong {
+            --hue: var(--hue-wrong);
+        }
+
+        .container {
+            width: 800px;
+            max-width: 80%;
+            background-color: white;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 0 10px 2px;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, auto);
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .btn {
+            --hue: var(--hue-neutral);
+            border: 1px solid hsl(var(--hue), 100%, 30%);
+            background-color: hsl(var(--hue), 100%, 50%);
+            border-radius: 5px;
+            padding: 5px 10px;
+            color: white;
+            outline: none;
+        }
+
+        .btn:hover {
+            border-color: black;
+        }
+
+        .btn.correct {
+            --hue: var(--hue-correct);
+            color: black;
+        }
+
+        .btn.wrong {
+            --hue: var(--hue-wrong);
+        }
+        
+        .start-btn,
+        .next-btn,
+        .back-btn {
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 10px 20px;
+        }
+
+        .answered-box {
+            border-radius: 10px;
+            height: 30px;
+            width: 30px;
+            margin-right: 50px;
+        }
+
+        .additional-info {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-style: dashed;
+            border-color: green;
+            border-radius: 10px;
+            padding: 10px;
+            background-color: aquamarine;
+        }
+
+        .card-count {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .options {
+            margin-right: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+            border-radius: 10px;
+            border-style: dashed;
+            border-color:crimson;
+        }
+
+        .hide {
+            display: none;
+        }
+    </style>
+    <script>
+
+        // Add an event listener for the DOMContentLoaded event
+        window.addEventListener("DOMContentLoaded", domLoaded);
+
+        function domLoaded() {
+            const startButton = document.getElementById('start-btn')
+            const nextButton = document.getElementById('next-btn')
+            const questionContainerElement = document.getElementById('question-container')
+            const questionElement = document.getElementById('question')
+            const answerButtonsElement = document.getElementById('answer-buttons')
+
+            //----------ADDED OPTIONS---------
+            const options = document.getElementById('options-div')
+            let optShuffleDeck// = document.querySelector('#shuffle-option:checked') !== null
+            let optRemoveCorrect //= document.querySelector('#remove-option:checked') !== null
+            let optTimedSession //= document.querySelector('#timed-option:checked') !== null
+            let timer = document.getElementById('timer')
+            let timerEnd
+            let minutes = 0
+            let seconds = 0
+
+            //const nextNav = document.getElementById('next-nav')
+            const backButton = document.getElementById('back-btn')
+
+            const cardCount = document.getElementById('card-count')
+            let prevAnswered = document.getElementById('prev-answered')
+            let additionalInfo = document.getElementById('additional-info')
+            let answeredQuestions = [], answeredCount
+
+            //--------------------------------
+            
+            let questionsArr = [], currentQuestionIndex
+            //using the domLoaded function because the buttons need to be rendered before we can
+            //add an event listener
+            startButton.addEventListener('click', startGame)
+            nextButton.addEventListener('click', () => {
+                //startButton.classList.add('hide')
+
+                if( questionsArr.length <= currentQuestionIndex+1 ) { 
+                    currentQuestionIndex = 0;
+                } else {
+                    currentQuestionIndex++
+                }
+
+                setNextQuestion()
+            })
+
+            backButton.addEventListener('click', () => {
+                startButton.classList.add('hide')
+                if( currentQuestionIndex == 0 ) {
+                    if( answeredCount < questionsArr.length ) {
+                        currentQuestionIndex = questionsArr.length-1;
+                    }
+                } else {
+                    currentQuestionIndex--
+                }
+                setNextQuestion()
+            })
+
+            function startGame() {
+                startButton.classList.add('hide')
+                options.classList.add('hide')
+
+                optShuffleDeck = document.querySelector('#shuffle-option:checked') !== null
+                optRemoveCorrect = document.querySelector('#remove-option:checked') !== null
+                optTimedSession = document.querySelector('#timed-option:checked') !== null
+
+                console.log("Remove Correct: " + optRemoveCorrect)
+                console.log("Timer: " + optTimedSession)
+                console.log("Shuffle: " + optShuffleDeck)
+
+                if( optTimedSession ) {
+                    timerEnd = false
+                    resetTimer()
+                    setTimeout(IncrementTimer,1)
+                }
+
+                questionsArr.length = 0;
+                if( optShuffleDeck ) {
+                    //shuffledQuestions previously
+                    questionsShuffled = questions.sort(() => Math.random() - .5)
+
+                    for( i = 0; i < questions.length; ++i ) {
+                        questionsArr.push(questionsShuffled[i])
+                    }
+                } else {
+                    for( i = 0; i < questions.length; ++i ) { 
+                        questionsArr.push(questions[i])
+                    }
+                }
+
+                for(var i = 0; i < questionsArr.length; ++i ) {
+                    answeredQuestions[i] = false
+                }
+                answeredCount = 0
+                currentQuestionIndex = 0
+                questionContainerElement.classList.remove('hide')
+                setNextQuestion()
+            }
+
+            function setNextQuestion() {      
+                if( !optRemoveCorrect ) {
+                    if( answeredQuestions[currentQuestionIndex] == true ) {
+                        prevAnswered.style.background="green"
+                    } else {
+                        prevAnswered.style.background="transparent"
+                    }
+                } 
+
+                if( !optRemoveCorrect ) {
+                    if( questionsArr.length == currentQuestionIndex+1 && answeredQuestions[currentQuestionIndex] == true ) {
+                        startButton.classList.remove('hide')
+                        nextButton.classList.remove('hide')
+                        backButton.classList.remove('hide')
+                    } else {
+                        startButton.classList.add('hide')
+                        nextButton.classList.remove('hide')
+                        backButton.classList.remove('hide')
+                    }
+                } else {
+                    startButton.classList.add('hide')
+                    nextButton.classList.remove('hide')
+                    backButton.classList.remove('hide')
+                }
+
+                //nextButton.classList.remove('hide')
+                //backButton.classList.remove('hide')
+
+                cardCount.innerHTML = (currentQuestionIndex+1) + "/" + questionsArr.length
+                resetState()
+                showQuestion(questionsArr[currentQuestionIndex])
+            }
+
+            function showQuestion(question) {
+                additionalInfo.classList.add('hide')
+
+                questionElement.innerText = question.question
+                question.answers.forEach(answer => {
+                    const button = document.createElement('button')
+                    button.innerText = answer.text
+                    button.classList.add('btn')
+                    if (answer.correct) {
+                        button.dataset.correct = answer.correct
+                    }
+                    button.addEventListener('click', selectAnswer)
+                    answerButtonsElement.appendChild(button)
+                })
+            }
+
+            function resetState() {
+                clearStatusClass(document.body)
+                //nextButton.classList.add('hide')
+                while (answerButtonsElement.firstChild) {
+                    answerButtonsElement.removeChild(answerButtonsElement.firstChild)
+                }
+            }
+
+            function selectAnswer(e) {
+                const selectedButton = e.target
+                const correct = selectedButton.dataset.correct
+                
+                setStatusClass(document.body, correct)
+                Array.from(answerButtonsElement.children).forEach(button => {
+                    setStatusClass(button, button.dataset.correct)
+                })
+                if ( optRemoveCorrect ) {
+                    backButton.classList.add('hide')
+
+                    if( correct ) {
+                        if(questionsArr.length > 1) {
+                            //nextButton.classList.remove('hide')
+                        } else {
+                            timerEnd = true
+                            startButton.innerText = 'Restart'
+                            startButton.classList.remove('hide')
+                            nextButton.classList.add('hide')
+                            backButton.classList.add('hide')
+                        }
+                        
+                        questionsArr.splice(currentQuestionIndex,1)
+                        answeredCount++
+                        currentQuestionIndex--
+                    } else {
+                        additionalInfo.classList.remove('hide')
+                        additionalInfo.innerText = questionsArr[currentQuestionIndex].info
+                    }
+                } else {
+                    if( correct ) {
+                        answeredQuestions[currentQuestionIndex] = true
+
+                        if (questionsArr.length > currentQuestionIndex + 1) {
+                            //backButton.classList.add('hide')
+                        } else {
+                            startButton.innerText = 'Restart'
+                            startButton.classList.remove('hide')
+                            //nextButton.classList.add('hide')
+                        }
+                    } else {
+                        additionalInfo.classList.remove('hide')
+                        additionalInfo.innerText = questionsArr[currentQuestionIndex].info
+                    }
+                }
+            }
+
+            function setStatusClass(element, correct) {
+                clearStatusClass(element)
+                if (correct) {
+                    element.classList.add('correct')
+                } else {
+                    element.classList.add('wrong')
+                }
+            }
+
+            function clearStatusClass(element) {
+                element.classList.remove('correct')
+                element.classList.remove('wrong')
+            }
+
+            //----------Added Functions-----------
+            function IncrementTimer() {
+                seconds++
+                if( seconds % 60 == 0 ) {
+                    minutes++
+                }
+
+                if( seconds % 60 < 10 ) {
+                    timer.innerHTML = minutes + ":0" + seconds%60
+                } else {
+                    timer.innerHTML = minutes + ":" + seconds%60
+                }
+
+                if( timerEnd ) {
+                    return
+                }
+                setTimeout(IncrementTimer,1000)
+
+                setTimerColor()
+            }
+
+            function setTimerColor() {
+                if( seconds >= 30 && (seconds % 30 == 0 || seconds % 30 == 2) ) {
+                    timer.style.background = "red"
+                }
+                else {
+                    timer.style.background = "transparent"
+                }
+            }
+
+            function resetTimer() {
+                minutes = 0
+                seconds = 0
+                timer.innerHTML = "0:00"
+            }
+            //------------------------------------
+
+            const questions = [
+                {
+                    info: 'The correct answer is Kabaddi\nA seven man team game popular in East Asia, whose objective in the attacking phase is to tag your opponents and escape back to your side to consider these tagged opponents "out"',
+                    question: 'Being the national sport of Bangladesh, which team sport\'s objective is to "tag" your opponent while escaping to your team\'s side without being pinned by the opposing team',
+                    answers: [
+                        { text: 'Cricket', correct: false },
+                        { text: 'Rugby', correct: false },
+                        { text: 'Kabaddi', correct: true },
+                        { text: 'Squid Game', correct: false },
+                    ]
+                },
+                {
+                    info: 'The correct answer is Hurling\nIn this Irish originating sport players weild a stick called  hurley',
+                    question: 'In which sport do its players weild a wooden stick with the goal of hitting a small ball known as a sliotar towards the opponents goalposts?',
+                    answers: [
+                        { text: 'Gaelic Football', correct: false },
+                        { text: 'Hockey', correct: false },
+                        { text: 'Aikido', correct: false },
+                        { text: 'Hurling', correct: true },
+                        { text: 'Lacrosse', correct: false },
+                        { text: 'Diving', correct: false },
+                    ]
+                },
+                {
+                    info: '1. Lionel Messi: $130 million - On-Field:$75 million, | Off-Field:$55 million\n'
+                        + '2. Lebron James: $121 million - On-Field:$41 million, | Off-Field:$80 million\n'
+                        + '3. Christiano Ronaldo: $115 million - On-Field:$60 million, | Off-Field:$55 million\n'
+                        + '4. Neymar: $95 million - On-Field:$70 million, | Off-Field:$25 million\n'
+                        + '5. Roger Federer: $90.7 million - On-Field:$0.7 million, | Off-Field:$90 million\n',
+
+                    question: 'According to Forbes, as of 2022, who is the highest paid athelte in the world, considering endorsements?',
+                    answers: [
+                        { text: 'Lebron James', correct: false },
+                        { text: 'Neymar', correct: false },
+                        { text: 'Christiano Ronaldo', correct: false },
+                        { text: 'Lionel Messi', correct: true },
+                        { text: 'Roger Federer', correct: false },
+                    ]
+                },
+                {
+                    info: 'gobble gobble',
+                    question: 'What is it called when you bowl 3 strikes in back to back frames',
+                    answers: [
+                        { text: 'Fowl', correct: false },
+                        { text: 'Turkey', correct: true },
+                        { text: 'Chick Magnet', correct: false },
+                        { text: 'Pigeon', correct: false },
+                        { text: 'Chicken', correct: false },
+                        { text: 'Being a Baller', correct: false },
+                    ]
+                },
+                {
+                    info: 'YOU THOUGHT IS WAS HOCKEY?!! BWAHAHAHAHAHAHAHHAHAHA',
+                    question: 'What is Canada\'s national sport?',
+                    answers: [
+                        { text: 'Being Really Nice', correct: false },
+                        { text: 'Hockey', correct: false },
+                        { text: 'Lacrosse', correct: true },
+                        { text: 'Eating Syrup Making', correct: false },
+                        { text: 'Making Fun of Drake', correct: false },
+                        { text: 'Making Fun of Justin Bieber', correct: false },
+                    ]
+                },
+                {
+                    info: 'With no boundaries and the goals sometimes spanning several miles, between villages, you can understand why there might up to 100,000 players',
+                    question: 'Originally a Native American sport, according to some estimates, lacrosse games involved nearly 100,000 players',
+                    answers: [
+                        { text: 'True', correct: true },
+                        { text: 'False', correct: false },
+                    ]
+                },
+                {
+                    info: 'Because they suck',
+                    question: 'What is the only team in the NFL to neither host nor play in the Super Bowl?',
+                    answers: [
+                        { text: 'Cleveland Browns', correct: true },
+                        { text: 'Houston Texans', correct: false },
+                        { text: 'Detroit Lions', correct: false },
+                        { text: 'Jacksonville Jaguars', correct: false },
+                        { text: 'Washington Commanders', correct: false },
+                        { text: 'Chicago Cubs', correct: false },
+                    ]
+                },
+                {
+                    info: 'Wut Wut',
+                    question: 'There are only two states in the United States that have yet to send a team to the NCAA. What are they?',
+                    answers: [
+                        { text: 'Washington DC & Wyoming', correct: false },
+                        { text: 'Hawaii & South Carolina', correct: false },
+                        { text: 'Alaska & Maine', correct: true },
+                        { text: 'Rhode Island & New Jersey', correct: false },
+                    ]
+                },
+                {
+                    info: 'Bullseye = 50 | Triple 20 = 60',
+                    question: 'In darts, is a bullseye the highest score you can receive?',
+                    answers: [
+                        { text: 'True', correct: false },
+                        { text: 'False', correct: true },
+                    ]
+                },
+                {
+                    info: 'Originally failing to represent Jamaica for the 100m, the movie follows our character\'s attempt to win an olympic medal, redeeming themselves through olympic bobsleding',
+                    question: 'What olympic sport is the main plot point of the hit 1993 movie "Cool Runnings"?',
+                    answers: [
+                        { text: '100m Sprint', correct: false },
+                        { text: 'Cross Country', correct: false },
+                        { text: 'Slolam', correct: false },
+                        { text: 'Bobsled', correct: true },
+                    ]
+                },
+            ]
+        }
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <div id="additional-info" class="additional-info hide"></div>
+        <div id="question-container" class="hide">
+            <h2><div class="timer" id="timer"></div></h2>
+            <h3><div class="card-count" id="card-count"></div></h3>
+            <div class="answered-box" id="prev-answered"></div>
+            <div id="question">Question</div>
+            <div id="answer-buttons" class="btn-grid">
+                <button class="btn">Answer 1</button>
+                <button class="btn">Answer 2</button>
+                <button class="btn">Answer 3</button>
+                <button class="btn">Answer 4</button>
+            </div>
+        </div>
+        <div class="controls" id="controls-div">
+            <div class="options" id="options-div">
+                <h1>Options:</h1>
+                <h3>
+                    Shuffle Cards:
+                    <input type="checkbox" id="shuffle-option" checked>
+                </h3>
+                <h3>
+                    Remove Correct From Deck:
+                    <input type="checkbox" id="remove-option" checked>
+                </h3>
+                <h3>
+                    Timed Session:
+                    <input type="checkbox" id="timed-option">
+                </h3>
+            </div>
+            <!--<button id="next-nav" class="btn , hide">Next</button>-->
+            <button id="back-btn" class="back-btn btn hide">Back</button>
+            <button id="next-btn" class="next-btn btn hide">Next</button>
+            <button id="start-btn" style="margin:10px"class="start-btn btn">Start</button>
+        </div>
+    </div>
+</body>
+
+
+
+</html>
